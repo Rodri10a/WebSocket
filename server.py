@@ -1,14 +1,14 @@
 import socket
-import threading
-import signal
-import sys
+import threading 
+import signal # sirve para detectar señales del sistema 
+import sys # para interactuar con el interprete de python 
 
-# donde va a escuchar el servidor
+# donde va a escuchar el servidor 
 HOST = '127.0.0.1'
 PORT = 55123
 
 # creo mi socket 
-server = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # protocolo TCP 
+server = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # protocolo TCP IPv4 
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # permite reutilizar la dirreccion inmediatamente 
 
 server.bind((HOST, PORT)) # asocio al socket 
@@ -27,48 +27,61 @@ def cerrar_servidor(sig, frame):
     server.close()
     sys.exit(0) # termina el programa 
 
-signal.signal(signal.SIGINT, cerrar_servidor)
+# registra cuando tocas ctrl+C
+signal.signal(signal.SIGINT, cerrar_servidor) 
+
 
 def broadcast(mensaje):
     for cliente in list(clientes.keys()):
         try:
-            cliente.send(mensaje)
+            cliente.send(mensaje) # intenta enviar mensaje
         except:
+            # si hay error, simplemente continua 
             pass
 
-def handle(cliente):
+def handle(cliente): # manejar cada cliente 
     nombre = None
     try:
         # Pedir nombre
-        cliente.send("Nombre: ".encode("utf-8"))
-        nombre = cliente.recv(1024).decode("utf-8").strip()
-        clientes[cliente] = nombre
+        cliente.send("Nombre: ".encode("utf-8")) # envia pregunta 
+        nombre = cliente.recv(1024).decode("utf-8").strip() # recibe propuesta 
+        clientes[cliente] = nombre # guarda el cliente en el diccionario 
         
-        print(f"[+] {nombre} conectado")
-        broadcast(f"{nombre} entró al chat".encode("utf-8"))
+        # notifica al servidor y a todos los clientes 
+        print(f"[+] {nombre} conectado") 
+        broadcast(f"{nombre} entró al chat".encode("utf-8")) 
         
-        # Recibir mensajes
+        # Recibir mensajes del cliente 
         while True:
-            mensaje = cliente.recv(1024).decode("utf-8").strip()
-            if not mensaje or mensaje == "/salir":
+            mensaje = cliente.recv(1024).decode("utf-8").strip() 
+            if not mensaje or mensaje == "/salir": # si no hay mensaje o escribe /salir, termina 
                 break
             print(f"{nombre}: {mensaje}")
-            broadcast(f"{nombre}: {mensaje}".encode("utf-8"))
+            broadcast(f"{nombre}: {mensaje}".encode("utf-8")) # envia el mensaje a todos los demas clientes 
             
     except:
+        # si hay cualquier error de conexion, sale del try 
         pass
-    finally:
+    finally: # finally es la limpieza obligatoria, basicamente se ejecuta siempre pase lo que pase 
+        # esto siempre se ejecuta al salir 
         if cliente in clientes:
             print(f"[-] {clientes[cliente]} desconectado")
-            broadcast(f"{clientes[cliente]} salió".encode("utf-8"))
-            del clientes[cliente]
-        cliente.close()
+            broadcast(f"{clientes[cliente]} salió".encode("utf-8")) 
+            del clientes[cliente] # elimina del diccionario 
+        cliente.close() # cierra conexion 
 
+# bucle principal 
 while servidor_corriendo:
     try:
-        cliente, _ = server.accept()
+        # se espera a que se conecte 
+        cliente, _ = server.accept() 
+        
+        # se crea un hilo para manejar a este cliente 
+        # daemon= True hace que el hilo se cierre cuando termine el programa 
         threading.Thread(target=handle, args=(cliente,), daemon=True).start() 
     except socket.timeout:
+        # esto permite verificar si el servidor_corriendo sigue siendo True 
         continue
     except:
+        # cualquier otro error, sale del bucle 
         break
